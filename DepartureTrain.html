@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyper-Realistic 3D Train Departure Board</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Atmosphere & Environment */
+            --bg-base: #e8e6e1;
+            --bg-vignette: rgba(0, 0, 0, 0.2);
+            
+            /* 3D Box Dimensions */
+            --board-w: 1040px;
+            --board-h: 480px;
+            --board-d: 80px; /* Depth of the 3D box */
+            
+            /* Casing Materials (Matte Dark Metal/Plastic) */
+            --case-front: #222;
+            --case-top: #383838; /* Catching top light */
+            --case-bottom: #050505; /* Deep shadow */
+            --case-left: #2a2a2a; /* Slightly lit */
+            --case-right: #0a0a0a; /* Shadow */
+            --case-back: #111;
+            
+            /* Screen & LED */
+            --screen-bg: #0a0a0a;
+            --text-glow-color: #ff9d00; /* Deep amber neon */
+            --text-main: #ff9d00;
+            --text-dim: #b36e00;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-base);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'VT323', monospace;
+            overflow: hidden;
+            background: radial-gradient(circle at 50% 40%, var(--bg-base) 0%, #d1cfca 100%);
+        }
+
+        /* High-quality SVG Film Grain */
+        .noise-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0.65;
+            mix-blend-mode: multiply;
+            background: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noise"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="2.2" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noise)" opacity="0.35"/%3E%3C/svg%3E');
+        }
+
+        .vignette-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 99;
+            box-shadow: inset 0 0 300px var(--bg-vignette);
+        }
+
+        .scene {
+            perspective: 2000px;
+            transform: scale(0.75); 
+        }
+
+        .board-assembly {
+            width: var(--board-w);
+            height: var(--board-h);
+            position: relative;
+            transform-style: preserve-3d;
+            /* Static, striking 3D tilt */
+            transform: rotateX(14deg) rotateY(-24deg) rotateZ(2deg);
+        }
+
+        /* The physical shadow cast on the wall behind the board */
+        .ambient-shadow {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            transform: translateZ(-60px) translateX(-20px) translateY(30px);
+            filter: blur(25px);
+            border-radius: 10px;
+        }
+
+        /* 3D Faces Base - Mathematically perfect center alignment */
+        .face {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-style: preserve-3d;
+        }
+
+        /* Front Face (Contains Screen) */
+        .face-front {
+            width: var(--board-w);
+            height: var(--board-h);
+            background: var(--case-front);
+            transform: translate(-50%, -50%) translateZ(calc(var(--board-d) / 2));
+            /* Beveled plastic edge look */
+            border: 2px solid #333;
+            border-bottom: 2px solid #111;
+            border-right: 2px solid #111;
+            border-top: 2px solid #444;
+            border-left: 2px solid #2a2a2a;
+            border-radius: 8px;
+            
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Back Face */
+        .face-back {
+            width: var(--board-w);
+            height: var(--board-h);
+            background: var(--case-back);
+            transform: translate(-50%, -50%) translateZ(calc(var(--board-d) / -2)) rotateY(180deg);
+        }
+
+        /* Right Face */
+        .face-right {
+            width: var(--board-d);
+            height: var(--board-h);
+            background: var(--case-right);
+            transform: translate(-50%, -50%) translateX(calc(var(--board-w) / 2)) rotateY(90deg);
+        }
+
+        /* Left Face */
+        .face-left {
+            width: var(--board-d);
+            height: var(--board-h);
+            background: var(--case-left);
+            transform: translate(-50%, -50%) translateX(calc(var(--board-w) / -2)) rotateY(-90deg);
+        }
+
+        /* Top Face */
+        .face-top {
+            width: var(--board-w);
+            height: var(--board-d);
+            background: var(--case-top);
+            transform: translate(-50%, -50%) translateY(calc(var(--board-h) / -2)) rotateX(90deg);
+        }
+
+        /* Bottom Face */
+        .face-bottom {
+            width: var(--board-w);
+            height: var(--board-d);
+            background: var(--case-bottom);
+            transform: translate(-50%, -50%) translateY(calc(var(--board-h) / 2)) rotateX(-90deg);
+        }
+
+        .screen-bezel {
+            width: 96%;
+            height: 92%;
+            background: #000;
+            border-radius: 6px;
+            padding: 4px;
+            /* Inner shadow creating deep recess for the screen */
+            box-shadow: 
+                inset 0 10px 25px rgba(0,0,0,1),
+                inset 0 2px 8px rgba(0,0,0,1),
+                0 1px 1px rgba(255,255,255,0.05);
+        }
+
+        .screen {
+            position: relative;
+            background-color: var(--screen-bg);
+            width: 100%;
+            height: 100%;
+            border-radius: 3px;
+            padding: 25px 35px;
+            overflow: hidden;
+            transform: translateZ(1px); /* Keep above pseudo-elements */
+        }
+
+        /* Realistic LED pixel grid overlay */
+        .screen-grid {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 8;
+            /* Creates tiny 2px black squares to chop text into pixels */
+            background-image: 
+                linear-gradient(to right, rgba(0,0,0,0.85) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0,0,0,0.85) 1px, transparent 1px);
+            background-size: 3px 3px; 
+        }
+
+        /* Angled Glass Glare */
+        .screen-glare {
+            position: absolute;
+            top: -50%; left: -50%; right: -50%; bottom: -50%;
+            pointer-events: none;
+            z-index: 10;
+            background: linear-gradient(
+                105deg, 
+                transparent 40%, 
+                rgba(255, 255, 255, 0.04) 45%, 
+                rgba(255, 255, 255, 0.08) 50%, 
+                transparent 54%
+            );
+            transform: translateY(-5%);
+            mix-blend-mode: screen;
+        }
+
+        .content {
+            position: relative;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            height: 100%;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #4a2e00;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
+
+        .title-group, .clock {
+            color: var(--text-main);
+            font-size: 30px;
+            letter-spacing: 2px;
+            /* Intense Phosphor Bloom */
+            text-shadow: 
+                0 0 5px var(--text-glow-color),
+                0 0 15px var(--text-glow-color);
+        }
+
+        .grid-row {
+            display: grid;
+            grid-template-columns: 320px 100px 220px 120px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .col-headers {
+            font-size: 18px;
+            color: var(--text-dim);
+            padding-bottom: 6px;
+            border-bottom: 1px dashed #4a2e00;
+            margin-bottom: 10px;
+            text-shadow: none;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        
+        .col-headers span:nth-child(2),
+        .col-headers span:nth-child(3) { text-align: center; }
+        .col-headers span:last-child { text-align: right; }
+
+        .data-row {
+            font-size: 36px;
+            color: var(--text-main);
+            letter-spacing: 3px;
+            text-shadow: 
+                0 0 5px var(--text-glow-color),
+                0 0 12px var(--text-glow-color);
+            border-bottom: 1px solid rgba(255,157,0,0.05); 
+            padding: 6px 0;
+            line-height: 1;
+            text-transform: uppercase;
+            white-space: pre; 
+        }
+
+        .data-row:last-child { border-bottom: none; }
+
+        .dest-col { display: flex; align-items: center; gap: 12px; }
+        .plat-col { text-align: center; color: #ffb732; }
+        .remarks-col { text-align: center; }
+        .time-col { text-align: right; letter-spacing: 4px; }
+
+        .blink { animation: blinker 1s steps(2, start) infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <!-- Environment Overlays -->
+    <div class="noise-overlay"></div>
+    <div class="vignette-overlay"></div>
+
+    <div class="scene">
+        <div class="board-assembly">
+            
+            <!-- Ambient physical shadow -->
+            <div class="ambient-shadow"></div>
+
+            <!-- The 6 faces of the 3D Box -->
+            <div class="face face-back"></div>
+            <div class="face face-right"></div>
+            <div class="face face-left"></div>
+            <div class="face face-top"></div>
+            <div class="face face-bottom"></div>
+            
+            <!-- Front Face holding the Screen -->
+            <div class="face face-front">
+                <div class="screen-bezel">
+                    <div class="screen">
+                        <div class="screen-grid"></div>
+                        <div class="screen-glare"></div>
+                        
+                        <div class="content">
+                            <div class="header-top">
+                                <div class="title-group">
+                                    <span>DEPARTURES / आगमन</span>
+                                </div>
+                                <div class="clock" id="live-clock">00:00:00</div>
+                            </div>
+
+                            <div class="grid-row col-headers">
+                                <span>Destination</span>
+                                <span>Plat</span>
+                                <span>Status</span>
+                                <span>Time</span>
+                            </div>
+
+                            <!-- Data Rows -->
+                            <div class="grid-row data-row" id="row-0">
+                                <div class="dest-col" data-val="dest">--</div>
+                                <div class="plat-col" data-val="plat">--</div>
+                                <div class="remarks-col" data-val="rem">--</div>
+                                <div class="time-col" data-val="time">--:--</div>
+                            </div>
+                            <div class="grid-row data-row" id="row-1">
+                                <div class="dest-col" data-val="dest">--</div>
+                                <div class="plat-col" data-val="plat">--</div>
+                                <div class="remarks-col" data-val="rem">--</div>
+                                <div class="time-col" data-val="time">--:--</div>
+                            </div>
+                            <div class="grid-row data-row" id="row-2">
+                                <div class="dest-col" data-val="dest">--</div>
+                                <div class="plat-col" data-val="plat">--</div>
+                                <div class="remarks-col" data-val="rem">--</div>
+                                <div class="time-col" data-val="time">--:--</div>
+                            </div>
+                            <div class="grid-row data-row" id="row-3">
+                                <div class="dest-col" data-val="dest">--</div>
+                                <div class="plat-col" data-val="plat">--</div>
+                                <div class="remarks-col" data-val="rem">--</div>
+                                <div class="time-col" data-val="time">--:--</div>
+                            </div>
+                            <div class="grid-row data-row" id="row-4">
+                                <div class="dest-col" data-val="dest">--</div>
+                                <div class="plat-col" data-val="plat">--</div>
+                                <div class="remarks-col" data-val="rem">--</div>
+                                <div class="time-col" data-val="time">--:--</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- Live Clock ---
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours().toString().padStart(2, '0');
+            let minutes = now.getMinutes().toString().padStart(2, '0');
+            let seconds = now.getSeconds().toString().padStart(2, '0');
+            document.getElementById('live-clock').innerHTML = `${hours}<span class="blink">:</span>${minutes}<span class="blink">:</span>${seconds}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // --- Core Data ---
+        const destinations = [
+            "NEW DELHI", "SONIPAT", "PANIPAT", "CHANDIGARH", "MUMBAI", 
+            "LUCKNOW", "JAIPUR", "AMRITSAR", 
+            "VARANASI", "BHOPAL", "PUNE JN", "HOWRAH"
+        ];
+        const remarks = ["ON TIME", "ON TIME", "ON TIME", "DELAYED", "ARRIVED", "BOARDING", "DEPARTED", "CANCELLED"];
+        const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$*[]';
+        
+        // --- Mechanical Scramble Engine ---
+        function scrambleText(element, newText, duration = 1500) {
+            const currentText = element.innerText;
+            const length = Math.max(currentText.length, newText.length);
+            const paddedNew = newText.padEnd(length, ' ');
+            
+            let frame = 0;
+            const fps = 40; 
+            const totalFrames = duration / (1000 / fps);
+            
+            const interval = setInterval(() => {
+                let result = '';
+                for (let i = 0; i < length; i++) {
+                    // Lock characters in from left to right to simulate mechanical cascading
+                    const settleFrame = (i / length) * totalFrames;
+                    
+                    if (frame > settleFrame) {
+                        result += paddedNew[i];
+                    } else if (paddedNew[i] === ' ' && currentText[i] === ' ') {
+                        result += ' ';
+                    } else {
+                        result += SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+                    }
+                }
+                
+                element.innerText = result.trim() === '' ? ' ' : result;
+                frame++;
+                
+                if (frame >= totalFrames) {
+                    clearInterval(interval);
+                    element.innerText = newText;
+                }
+            }, 1000 / fps);
+        }
+
+        // --- Data Generator ---
+        function generateTrainData(isInitial = false) {
+            // Heavily weight user's requested destinations
+            const requiredPool = ["NEW DELHI", "SONIPAT", "PANIPAT", "CHANDIGARH", "MUMBAI"];
+            const pool = Math.random() > 0.35 ? requiredPool : destinations;
+            const dest = pool[Math.floor(Math.random() * pool.length)];
+            
+            const plat = (Math.floor(Math.random() * 12) + 1).toString().padStart(2, '0');
+            const rem = remarks[Math.floor(Math.random() * remarks.length)];
+            
+            const now = new Date();
+            now.setMinutes(now.getMinutes() + (isInitial ? Math.floor(Math.random() * 60) : Math.floor(Math.random() * 180) + 10));
+            const hours = now.getHours().toString().padStart(2, '0');
+            const mins = now.getMinutes().toString().padStart(2, '0');
+            const time = `${hours}:${mins}`;
+
+            return { dest, plat, rem, time };
+        }
+
+        // --- Board Controller ---
+        function updateBoardRow(rowIndex, isInitial = false) {
+            const row = document.getElementById(`row-${rowIndex}`);
+            if (!row) return;
+
+            const data = generateTrainData(isInitial);
+            
+            // Stagger durations for mechanical realism
+            scrambleText(row.querySelector('[data-val="dest"]'), data.dest, 1800);
+            scrambleText(row.querySelector('[data-val="plat"]'), data.plat, 900);
+            scrambleText(row.querySelector('[data-val="rem"]'), data.rem, 1400);
+            scrambleText(row.querySelector('[data-val="time"]'), data.time, 1200);
+        }
+
+        // Initialize all rows immediately
+        for(let i = 0; i < 5; i++) {
+            updateBoardRow(i, true);
+        }
+
+        // Randomly update one row every 5-8 seconds
+        setInterval(() => {
+            const randomRow = Math.floor(Math.random() * 5);
+            updateBoardRow(randomRow, false);
+        }, 6000); 
+
+    </script>
+</body>
+</html>
