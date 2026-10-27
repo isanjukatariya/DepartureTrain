@@ -2,36 +2,61 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Hyper-Realistic 3D Train Departure Board</title>
-    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
     <style>
         :root {
             /* Atmosphere & Environment */
             --bg-base: #e8e6e1;
-            --bg-vignette: rgba(0, 0, 0, 0.2);
+            --bg-outer: #cfccc4;
+            --bg-vignette: rgba(0, 0, 0, 0.22);
             
-            /* 3D Box Dimensions */
+            /* 3D Box Dimensions - Heavy Industrial Enclosure */
             --board-w: 1040px;
             --board-h: 480px;
-            --board-d: 80px; /* Depth of the 3D box */
+            --board-d: 120px; /* Heavy 3D box depth */
             
-            /* Casing Materials (Matte Dark Metal/Plastic) */
-            --case-front: #222;
-            --case-top: #383838; /* Catching top light */
-            --case-bottom: #050505; /* Deep shadow */
-            --case-left: #2a2a2a; /* Slightly lit */
-            --case-right: #0a0a0a; /* Shadow */
-            --case-back: #111;
+            /* Casing Materials (Matte Dark Cast Metal/Steel) */
+            --case-front: #202124;
+            --case-top: #383a3f;
+            --case-bottom: #08090a;
+            --case-left: #2a2c30;
+            --case-right: #101113;
+            --case-back: #151619;
             
             /* Screen & LED */
             --screen-bg: #0a0a0a;
             --text-glow-color: #ff9d00; /* Deep amber neon */
             --text-main: #ff9d00;
             --text-dim: #b36e00;
+
+            /* Dynamic Lighting Variables (Updated by 3D Orbit Engine) */
+            --glare-pos-x: 0%;
+            --glare-pos-y: 0%;
+            --light-top: 1.1;
+            --light-bottom: 0.5;
+            --light-left: 0.95;
+            --light-right: 0.65;
+            --light-front: 1.0;
+            --light-back: 0.75;
+            --shadow-x: -24px;
+            --shadow-y: 38px;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body.night-mode {
+            --bg-base: #111317;
+            --bg-outer: #050608;
+            --bg-vignette: rgba(0, 0, 0, 0.75);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
 
         body, html {
             width: 100%;
@@ -42,7 +67,14 @@
             align-items: center;
             font-family: 'VT323', monospace;
             overflow: hidden;
-            background: radial-gradient(circle at 50% 40%, var(--bg-base) 0%, #d1cfca 100%);
+            background: radial-gradient(circle at 50% 40%, var(--bg-base) 0%, var(--bg-outer) 100%);
+            cursor: grab;
+            touch-action: none;
+            transition: background 0.5s ease;
+        }
+
+        body.dragging {
+            cursor: grabbing;
         }
 
         /* High-quality SVG Film Grain */
@@ -51,9 +83,14 @@
             top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
             z-index: 100;
-            opacity: 0.65;
+            opacity: 0.6;
             mix-blend-mode: multiply;
             background: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noise"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="2.2" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noise)" opacity="0.35"/%3E%3C/svg%3E');
+        }
+
+        body.night-mode .noise-overlay {
+            opacity: 0.22;
+            mix-blend-mode: overlay;
         }
 
         .vignette-overlay {
@@ -62,11 +99,77 @@
             pointer-events: none;
             z-index: 99;
             box-shadow: inset 0 0 300px var(--bg-vignette);
+            transition: box-shadow 0.5s ease;
         }
 
+        /* Minimal Aesthetic Top-Right Night Mode Toggle */
+        .theme-toggle {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 200;
+            background: rgba(24, 25, 28, 0.78);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #d4d4d8;
+            padding: 7px 13px;
+            border-radius: 999px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 1.8px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+            transition: all 0.25s ease;
+        }
+
+        .theme-toggle:hover {
+            border-color: rgba(255, 157, 0, 0.5);
+            color: #ffffff;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+        }
+
+        .theme-toggle-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #ff9d00;
+            box-shadow: 0 0 8px #ff9d00;
+            transition: all 0.3s ease;
+        }
+
+        body:not(.night-mode) .theme-toggle {
+            background: rgba(28, 29, 32, 0.85);
+        }
+
+        body.night-mode .theme-toggle {
+            background: rgba(20, 22, 27, 0.9);
+            border-color: rgba(255, 157, 0, 0.45);
+            color: #ff9d00;
+            box-shadow: 0 0 18px rgba(255, 157, 0, 0.2);
+        }
+
+        /* 3D Scene & Camera Rig */
         .scene {
-            perspective: 2000px;
-            transform: scale(0.75); 
+            perspective: 2200px;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            z-index: 10;
+            transform-style: preserve-3d;
+        }
+
+        .camera-rig {
+            transform-style: preserve-3d;
+            will-change: transform;
         }
 
         .board-assembly {
@@ -74,19 +177,25 @@
             height: var(--board-h);
             position: relative;
             transform-style: preserve-3d;
-            /* Static, striking 3D tilt */
-            transform: rotateX(14deg) rotateY(-24deg) rotateZ(2deg);
+            will-change: transform;
         }
 
-        /* The physical shadow cast on the wall behind the board */
+        /* The physical shadow cast on the wall/space behind the board */
         .ambient-shadow {
             position: absolute;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.7);
-            transform: translateZ(-60px) translateX(-20px) translateY(30px);
-            filter: blur(25px);
-            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.68);
+            transform: translateZ(-95px) translateX(var(--shadow-x)) translateY(var(--shadow-y));
+            filter: blur(32px);
+            border-radius: 14px;
+            pointer-events: none;
+            transition: background 0.5s ease, box-shadow 0.5s ease;
+        }
+
+        body.night-mode .ambient-shadow {
+            background: rgba(0, 0, 0, 0.9);
+            box-shadow: 0 0 130px 25px rgba(255, 145, 0, 0.15);
         }
 
         /* 3D Faces Base - Mathematically perfect center alignment */
@@ -97,76 +206,320 @@
             transform-style: preserve-3d;
         }
 
+        /* Brushed Heavy Metal Surface Texture */
+        .metal-surface {
+            background-image: 
+                repeating-linear-gradient(
+                    90deg,
+                    rgba(255,255,255,0.014) 0px,
+                    rgba(255,255,255,0.014) 1px,
+                    transparent 1px,
+                    transparent 3px
+                ),
+                linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.22) 100%);
+        }
+
         /* Front Face (Contains Screen) */
         .face-front {
             width: var(--board-w);
             height: var(--board-h);
-            background: var(--case-front);
+            background-color: var(--case-front);
             transform: translate(-50%, -50%) translateZ(calc(var(--board-d) / 2));
-            /* Beveled plastic edge look */
-            border: 2px solid #333;
-            border-bottom: 2px solid #111;
-            border-right: 2px solid #111;
-            border-top: 2px solid #444;
-            border-left: 2px solid #2a2a2a;
+            border: 3px solid #383a40;
+            border-bottom: 3px solid #101113;
+            border-right: 3px solid #141518;
+            border-top: 3px solid #4a4d55;
+            border-left: 3px solid #2e3036;
             border-radius: 8px;
-            
             display: flex;
             justify-content: center;
             align-items: center;
+            filter: brightness(var(--light-front));
+            box-shadow: inset 0 0 0 3px #141517;
         }
 
-        /* Back Face */
+        /* Heavy Industrial Corner Gussets & Hex Bolts */
+        .corner-bolt {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #5c6068, #191b1f 75%);
+            border: 1px solid #0d0e10;
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.3), 0 1px 3px rgba(0,0,0,0.9);
+            z-index: 20;
+            transform: translateZ(2px);
+        }
+        .corner-bolt.tl { top: 8px; left: 8px; }
+        .corner-bolt.tr { top: 8px; right: 8px; }
+        .corner-bolt.bl { bottom: 8px; left: 8px; }
+        .corner-bolt.br { bottom: 8px; right: 8px; }
+
+        /* Back Face (Detailed Industrial Inspection Panel) */
         .face-back {
             width: var(--board-w);
             height: var(--board-h);
-            background: var(--case-back);
+            background-color: var(--case-back);
             transform: translate(-50%, -50%) translateZ(calc(var(--board-d) / -2)) rotateY(180deg);
+            border: 3px solid #282a2f;
+            border-radius: 8px;
+            filter: brightness(var(--light-back));
+            padding: 26px;
+            display: grid;
+            grid-template-columns: 1fr 300px 1fr;
+            gap: 22px;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.9);
+        }
+
+        .back-panel-bay {
+            border: 2px solid #23252a;
+            background: #111215;
+            border-radius: 4px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.85);
+        }
+
+        .louver-group {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+        .louver {
+            height: 8px;
+            background: #060708;
+            border-top: 2px solid #2d3036;
+            border-bottom: 1px solid rgba(255, 157, 0, 0.22);
+            border-radius: 2px;
+        }
+
+        .spec-plate {
+            background: linear-gradient(135deg, #282a2e 0%, #16181b 100%);
+            border: 1px solid #484c54;
+            padding: 14px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 11px;
+            color: #d1d5db;
+            line-height: 1.6;
+            letter-spacing: 1px;
+            border-radius: 3px;
+        }
+        .spec-plate strong {
+            color: #ff9d00;
+            display: block;
+            margin-bottom: 4px;
+            border-bottom: 1px solid #3b3e45;
+            padding-bottom: 4px;
+        }
+
+        .hv-badge {
+            background: #eab308;
+            color: #090a0b;
+            font-family: 'Share Tech Mono', monospace;
+            font-weight: bold;
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 3px;
+            text-align: center;
+            letter-spacing: 1.5px;
+            border: 2px solid #000;
+        }
+
+        .back-stencil {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 20px;
+            letter-spacing: 4px;
+            color: rgba(255, 255, 255, 0.14);
+            text-align: center;
+            border: 1px dashed rgba(255, 255, 255, 0.12);
+            padding: 8px;
         }
 
         /* Right Face */
         .face-right {
             width: var(--board-d);
             height: var(--board-h);
-            background: var(--case-right);
+            background-color: var(--case-right);
             transform: translate(-50%, -50%) translateX(calc(var(--board-w) / 2)) rotateY(90deg);
+            border: 2px solid #222428;
+            filter: brightness(var(--light-right));
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 30px 14px;
+            box-shadow: inset 0 0 25px rgba(0,0,0,0.85);
         }
 
         /* Left Face */
         .face-left {
             width: var(--board-d);
             height: var(--board-h);
-            background: var(--case-left);
+            background-color: var(--case-left);
             transform: translate(-50%, -50%) translateX(calc(var(--board-w) / -2)) rotateY(-90deg);
+            border: 2px solid #32353b;
+            filter: brightness(var(--light-left));
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 30px 14px;
+            box-shadow: inset 0 0 25px rgba(0,0,0,0.8);
+        }
+
+        .side-vents {
+            width: 80%;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .side-vent-slot {
+            height: 6px;
+            background: #070809;
+            border-top: 1px solid #383b42;
+            border-bottom: 1px solid rgba(255, 157, 0, 0.18);
+            border-radius: 2px;
+        }
+
+        .side-handle {
+            width: 74%;
+            height: 100px;
+            background: #0b0c0e;
+            border: 2px solid #2f3238;
+            border-radius: 5px;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .side-handle::after {
+            content: '';
+            width: 12px;
+            height: 78px;
+            background: linear-gradient(90deg, #4e525a, #1f2126);
+            border-radius: 5px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.9);
         }
 
         /* Top Face */
         .face-top {
             width: var(--board-w);
             height: var(--board-d);
-            background: var(--case-top);
+            background-color: var(--case-top);
             transform: translate(-50%, -50%) translateY(calc(var(--board-h) / -2)) rotateX(90deg);
+            border: 2px solid #484b52;
+            filter: brightness(var(--light-top));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 110px;
+            box-shadow: inset 0 0 25px rgba(0,0,0,0.7);
+            transform-style: preserve-3d;
+        }
+
+        .suspension-bracket {
+            width: 76px;
+            height: 74px;
+            background: #1e2024;
+            border: 3px solid #454952;
+            border-radius: 4px;
+            position: relative;
+            transform-style: preserve-3d;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 16px rgba(0,0,0,0.85);
+        }
+
+        /* 3D Steel Suspension Struts Rising Above the Board */
+        .suspension-strut {
+            width: 22px;
+            height: 180px;
+            background: repeating-linear-gradient(
+                0deg,
+                #2a2d32 0px,
+                #2a2d32 6px,
+                #17191c 6px,
+                #17191c 12px
+            );
+            border-left: 2px solid #4e535e;
+            border-right: 2px solid #101113;
+            position: absolute;
+            transform-origin: center bottom;
+            transform: rotateX(-90deg) translateZ(-90px);
+        }
+        .suspension-strut::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: inherit;
+            border-left: 2px solid #3c4048;
+            border-right: 2px solid #101113;
+            transform: rotateY(90deg);
+        }
+
+        .top-hatch {
+            width: 300px;
+            height: 68px;
+            border: 2px solid #26292e;
+            background: repeating-linear-gradient(
+                45deg,
+                #26282d,
+                #26282d 10px,
+                #1f2125 10px,
+                #1f2125 20px
+            );
+            border-radius: 4px;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
         }
 
         /* Bottom Face */
         .face-bottom {
             width: var(--board-w);
             height: var(--board-d);
-            background: var(--case-bottom);
+            background-color: var(--case-bottom);
             transform: translate(-50%, -50%) translateY(calc(var(--board-h) / 2)) rotateX(-90deg);
+            border: 2px solid #181a1d;
+            filter: brightness(var(--light-bottom));
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 90px;
+            box-shadow: inset 0 0 35px rgba(0,0,0,0.95);
         }
 
+        .bottom-grille {
+            width: 170px;
+            height: 50px;
+            border: 1px solid #24262b;
+            background: repeating-linear-gradient(
+                90deg,
+                #050506 0px,
+                #050506 6px,
+                #15171a 6px,
+                #15171a 12px
+            );
+            border-radius: 3px;
+        }
+
+        /* =========================================================
+           SCREEN BEZEL & LED MATRIX (Positive-Z for 100% Visibility)
+           ========================================================= */
         .screen-bezel {
             width: 96%;
             height: 92%;
             background: #000;
             border-radius: 6px;
-            padding: 4px;
-            /* Inner shadow creating deep recess for the screen */
+            padding: 6px;
+            transform: translateZ(1px);
+            border: 2px solid #121316;
+            /* Deep multi-stage inset shadow creating heavy recessed housing look */
             box-shadow: 
-                inset 0 10px 25px rgba(0,0,0,1),
-                inset 0 2px 8px rgba(0,0,0,1),
-                0 1px 1px rgba(255,255,255,0.05);
+                inset 0 12px 28px rgba(0,0,0,1),
+                inset 0 3px 10px rgba(0,0,0,1),
+                0 1px 1px rgba(255,255,255,0.07);
         }
 
         .screen {
@@ -174,10 +527,10 @@
             background-color: var(--screen-bg);
             width: 100%;
             height: 100%;
-            border-radius: 3px;
+            border-radius: 4px;
             padding: 25px 35px;
             overflow: hidden;
-            transform: translateZ(1px); /* Keep above pseudo-elements */
+            box-shadow: inset 0 0 35px rgba(0,0,0,0.95);
         }
 
         /* Realistic LED pixel grid overlay */
@@ -186,14 +539,13 @@
             top: 0; left: 0; right: 0; bottom: 0;
             pointer-events: none;
             z-index: 8;
-            /* Creates tiny 2px black squares to chop text into pixels */
             background-image: 
-                linear-gradient(to right, rgba(0,0,0,0.85) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(0,0,0,0.85) 1px, transparent 1px);
+                linear-gradient(to right, rgba(0,0,0,0.82) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0,0,0,0.82) 1px, transparent 1px);
             background-size: 3px 3px; 
         }
 
-        /* Angled Glass Glare */
+        /* Dynamic Angled Glass Glare */
         .screen-glare {
             position: absolute;
             top: -50%; left: -50%; right: -50%; bottom: -50%;
@@ -202,12 +554,11 @@
             background: linear-gradient(
                 105deg, 
                 transparent 40%, 
-                rgba(255, 255, 255, 0.04) 45%, 
-                rgba(255, 255, 255, 0.08) 50%, 
+                rgba(255, 255, 255, 0.035) 45%, 
+                rgba(255, 255, 255, 0.075) 50%, 
                 transparent 54%
             );
-            transform: translateY(-5%);
-            mix-blend-mode: screen;
+            transform: translate(var(--glare-pos-x), var(--glare-pos-y));
         }
 
         .content {
@@ -267,11 +618,12 @@
             text-shadow: 
                 0 0 5px var(--text-glow-color),
                 0 0 12px var(--text-glow-color);
-            border-bottom: 1px solid rgba(255,157,0,0.05); 
+            border-bottom: 1px solid rgba(255,157,0,0.06); 
             padding: 6px 0;
             line-height: 1;
             text-transform: uppercase;
-            white-space: pre; 
+            white-space: pre;
+            cursor: pointer;
         }
 
         .data-row:last-child { border-bottom: none; }
@@ -291,77 +643,162 @@
     <div class="noise-overlay"></div>
     <div class="vignette-overlay"></div>
 
-    <div class="scene">
-        <div class="board-assembly">
-            
-            <!-- Ambient physical shadow -->
-            <div class="ambient-shadow"></div>
+    <!-- Small Aesthetic Top-Right Night Mode Toggle -->
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle Night Mode">
+        <span class="theme-toggle-dot"></span>
+        <span id="theme-toggle-label">NIGHT</span>
+    </button>
 
-            <!-- The 6 faces of the 3D Box -->
-            <div class="face face-back"></div>
-            <div class="face face-right"></div>
-            <div class="face face-left"></div>
-            <div class="face face-top"></div>
-            <div class="face face-bottom"></div>
-            
-            <!-- Front Face holding the Screen -->
-            <div class="face face-front">
-                <div class="screen-bezel">
-                    <div class="screen">
-                        <div class="screen-grid"></div>
-                        <div class="screen-glare"></div>
-                        
-                        <div class="content">
-                            <div class="header-top">
-                                <div class="title-group">
-                                    <span>DEPARTURES / आगमन</span>
+    <div class="scene" id="scene">
+        <div class="camera-rig" id="camera-rig">
+            <div class="board-assembly" id="board-assembly">
+                
+                <!-- Ambient physical shadow -->
+                <div class="ambient-shadow"></div>
+
+                <!-- The 6 faces of the Heavy 3D Box -->
+                
+                <!-- Rear Inspection Panel Face -->
+                <div class="face face-back metal-surface">
+                    <div class="back-panel-bay">
+                        <div class="louver-group">
+                            <div class="louver"></div><div class="louver"></div><div class="louver"></div>
+                            <div class="louver"></div><div class="louver"></div><div class="louver"></div>
+                            <div class="louver"></div><div class="louver"></div>
+                        </div>
+                        <div class="back-stencil">NR // NDLS-01</div>
+                    </div>
+
+                    <div class="back-panel-bay">
+                        <div class="hv-badge">⚡ DANGER 440V AC</div>
+                        <div class="spec-plate">
+                            <strong>INDIAN RAILWAYS // S&T</strong>
+                            UNIT: SFD-1040 MATRIX<br>
+                            MASS: 185 KG STEEL<br>
+                            LED: AMBER 590nm<br>
+                            SEAL: IP65 CONCOURSE
+                        </div>
+                        <div class="back-stencil">SERVICE LOCK</div>
+                    </div>
+
+                    <div class="back-panel-bay">
+                        <div class="louver-group">
+                            <div class="louver"></div><div class="louver"></div><div class="louver"></div>
+                            <div class="louver"></div><div class="louver"></div><div class="louver"></div>
+                            <div class="louver"></div><div class="louver"></div>
+                        </div>
+                        <div class="back-stencil">VENTILATION</div>
+                    </div>
+                </div>
+
+                <!-- Right Side Casing Face -->
+                <div class="face face-right metal-surface">
+                    <div class="side-vents">
+                        <div class="side-vent-slot"></div><div class="side-vent-slot"></div>
+                        <div class="side-vent-slot"></div><div class="side-vent-slot"></div>
+                    </div>
+                    <div class="side-handle"></div>
+                    <div class="side-vents">
+                        <div class="side-vent-slot"></div><div class="side-vent-slot"></div>
+                        <div class="side-vent-slot"></div><div class="side-vent-slot"></div>
+                    </div>
+                </div>
+
+                <!-- Left Side Casing Face -->
+                <div class="face face-left metal-surface">
+                    <div class="side-vents">
+                        <div class="side-vent-slot"></div><div class="side-vent-slot"></div>
+                        <div class="side-vent-slot"></div><div class="side-vent-slot"></div>
+                    </div>
+                    <div class="side-handle"></div>
+                    <div class="side-vents">
+                        <div class="side-vent-slot"></div><div class="side-vent-slot"></div>
+                        <div class="side-vent-slot"></div><div class="side-vent-slot"></div>
+                    </div>
+                </div>
+
+                <!-- Top Casing Face with Overhead Suspension Brackets -->
+                <div class="face face-top metal-surface">
+                    <div class="suspension-bracket">
+                        <div class="suspension-strut"></div>
+                    </div>
+                    <div class="top-hatch"></div>
+                    <div class="suspension-bracket">
+                        <div class="suspension-strut"></div>
+                    </div>
+                </div>
+
+                <!-- Bottom Casing Face -->
+                <div class="face face-bottom metal-surface">
+                    <div class="bottom-grille"></div>
+                    <div class="bottom-grille"></div>
+                    <div class="bottom-grille"></div>
+                </div>
+                
+                <!-- Front Face holding the Recessed LED Screen & Train Routes -->
+                <div class="face face-front metal-surface">
+                    <div class="corner-bolt tl"></div>
+                    <div class="corner-bolt tr"></div>
+                    <div class="corner-bolt bl"></div>
+                    <div class="corner-bolt br"></div>
+
+                    <div class="screen-bezel">
+                        <div class="screen">
+                            <div class="screen-grid"></div>
+                            <div class="screen-glare"></div>
+                            
+                            <div class="content">
+                                <div class="header-top">
+                                    <div class="title-group">
+                                        <span>DEPARTURES / आगमन</span>
+                                    </div>
+                                    <div class="clock" id="live-clock">00:00:00</div>
                                 </div>
-                                <div class="clock" id="live-clock">00:00:00</div>
-                            </div>
 
-                            <div class="grid-row col-headers">
-                                <span>Destination</span>
-                                <span>Plat</span>
-                                <span>Status</span>
-                                <span>Time</span>
-                            </div>
+                                <div class="grid-row col-headers">
+                                    <span>Destination</span>
+                                    <span>Plat</span>
+                                    <span>Status</span>
+                                    <span>Time</span>
+                                </div>
 
-                            <!-- Data Rows -->
-                            <div class="grid-row data-row" id="row-0">
-                                <div class="dest-col" data-val="dest">--</div>
-                                <div class="plat-col" data-val="plat">--</div>
-                                <div class="remarks-col" data-val="rem">--</div>
-                                <div class="time-col" data-val="time">--:--</div>
-                            </div>
-                            <div class="grid-row data-row" id="row-1">
-                                <div class="dest-col" data-val="dest">--</div>
-                                <div class="plat-col" data-val="plat">--</div>
-                                <div class="remarks-col" data-val="rem">--</div>
-                                <div class="time-col" data-val="time">--:--</div>
-                            </div>
-                            <div class="grid-row data-row" id="row-2">
-                                <div class="dest-col" data-val="dest">--</div>
-                                <div class="plat-col" data-val="plat">--</div>
-                                <div class="remarks-col" data-val="rem">--</div>
-                                <div class="time-col" data-val="time">--:--</div>
-                            </div>
-                            <div class="grid-row data-row" id="row-3">
-                                <div class="dest-col" data-val="dest">--</div>
-                                <div class="plat-col" data-val="plat">--</div>
-                                <div class="remarks-col" data-val="rem">--</div>
-                                <div class="time-col" data-val="time">--:--</div>
-                            </div>
-                            <div class="grid-row data-row" id="row-4">
-                                <div class="dest-col" data-val="dest">--</div>
-                                <div class="plat-col" data-val="plat">--</div>
-                                <div class="remarks-col" data-val="rem">--</div>
-                                <div class="time-col" data-val="time">--:--</div>
+                                <!-- Data Rows -->
+                                <div class="grid-row data-row" id="row-0">
+                                    <div class="dest-col" data-val="dest">--</div>
+                                    <div class="plat-col" data-val="plat">--</div>
+                                    <div class="remarks-col" data-val="rem">--</div>
+                                    <div class="time-col" data-val="time">--:--</div>
+                                </div>
+                                <div class="grid-row data-row" id="row-1">
+                                    <div class="dest-col" data-val="dest">--</div>
+                                    <div class="plat-col" data-val="plat">--</div>
+                                    <div class="remarks-col" data-val="rem">--</div>
+                                    <div class="time-col" data-val="time">--:--</div>
+                                </div>
+                                <div class="grid-row data-row" id="row-2">
+                                    <div class="dest-col" data-val="dest">--</div>
+                                    <div class="plat-col" data-val="plat">--</div>
+                                    <div class="remarks-col" data-val="rem">--</div>
+                                    <div class="time-col" data-val="time">--:--</div>
+                                </div>
+                                <div class="grid-row data-row" id="row-3">
+                                    <div class="dest-col" data-val="dest">--</div>
+                                    <div class="plat-col" data-val="plat">--</div>
+                                    <div class="remarks-col" data-val="rem">--</div>
+                                    <div class="time-col" data-val="time">--:--</div>
+                                </div>
+                                <div class="grid-row data-row" id="row-4">
+                                    <div class="dest-col" data-val="dest">--</div>
+                                    <div class="plat-col" data-val="plat">--</div>
+                                    <div class="remarks-col" data-val="rem">--</div>
+                                    <div class="time-col" data-val="time">--:--</div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
+            </div>
         </div>
     </div>
 
@@ -385,9 +822,14 @@
         ];
         const remarks = ["ON TIME", "ON TIME", "ON TIME", "DELAYED", "ARRIVED", "BOARDING", "DEPARTED", "CANCELLED"];
         const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$*[]';
+        const activeTimers = new WeakMap();
         
         // --- Mechanical Scramble Engine ---
         function scrambleText(element, newText, duration = 1500) {
+            if (activeTimers.has(element)) {
+                clearInterval(activeTimers.get(element));
+            }
+
             const currentText = element.innerText;
             const length = Math.max(currentText.length, newText.length);
             const paddedNew = newText.padEnd(length, ' ');
@@ -416,9 +858,12 @@
                 
                 if (frame >= totalFrames) {
                     clearInterval(interval);
+                    activeTimers.delete(element);
                     element.innerText = newText;
                 }
             }, 1000 / fps);
+
+            activeTimers.set(element, interval);
         }
 
         // --- Data Generator ---
@@ -455,16 +900,193 @@
         }
 
         // Initialize all rows immediately
-        for(let i = 0; i < 5; i++) {
+        for (let i = 0; i < 5; i++) {
             updateBoardRow(i, true);
+            const rowEl = document.getElementById(`row-${i}`);
+            rowEl.addEventListener('click', () => {
+                if (!hasDragged) updateBoardRow(i, false);
+            });
         }
 
-        // Randomly update one row every 5-8 seconds
+        // Randomly update one row every 6 seconds
         setInterval(() => {
             const randomRow = Math.floor(Math.random() * 5);
             updateBoardRow(randomRow, false);
-        }, 6000); 
+        }, 6000);
 
+        // --- Night Mode Toggle ---
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeLabel = document.getElementById('theme-toggle-label');
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('night-mode');
+            const isNight = document.body.classList.contains('night-mode');
+            themeLabel.textContent = isNight ? 'DAY' : 'NIGHT';
+        });
+
+        // --- Full 3D Orbit, Zoom & Pan Space Engine ---
+        const cameraRig = document.getElementById('camera-rig');
+        const boardAssembly = document.getElementById('board-assembly');
+        const rootStyle = document.documentElement.style;
+
+        function getInitialScale() {
+            const wScale = (window.innerWidth * 0.82) / 1040;
+            const hScale = (window.innerHeight * 0.78) / 480;
+            return Math.min(0.82, Math.max(0.38, Math.min(wScale, hScale)));
+        }
+
+        const state = {
+            rotX: 14,
+            rotY: -24,
+            rotZ: 2,
+            scale: getInitialScale(),
+            panX: 0,
+            panY: 0,
+            targetRotX: 14,
+            targetRotY: -24,
+            targetRotZ: 2,
+            targetScale: getInitialScale(),
+            targetPanX: 0,
+            targetPanY: 0
+        };
+
+        let isPointerDown = false;
+        let isPanning = false;
+        let hasDragged = false;
+        let startX = 0;
+        let startY = 0;
+        let pinchStartDist = null;
+        let pinchStartScale = state.scale;
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.theme-toggle')) return;
+            isPointerDown = true;
+            hasDragged = false;
+            isPanning = e.button === 2 || e.shiftKey;
+            startX = e.clientX;
+            startY = e.clientY;
+            document.body.classList.add('dragging');
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isPointerDown) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDragged = true;
+
+            if (isPanning) {
+                state.targetPanX += dx;
+                state.targetPanY += dy;
+            } else {
+                state.targetRotY += dx * 0.36;
+                state.targetRotX = Math.max(-80, Math.min(80, state.targetRotX - dy * 0.32));
+                state.targetRotZ *= 0.94;
+            }
+
+            startX = e.clientX;
+            startY = e.clientY;
+        });
+
+        window.addEventListener('mouseup', () => {
+            isPointerDown = false;
+            document.body.classList.remove('dragging');
+        });
+
+        window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // Double-click anywhere to reset to signature 3D angle
+        window.addEventListener('dblclick', (e) => {
+            if (e.target.closest('.theme-toggle') || e.target.closest('.data-row')) return;
+            state.targetRotX = 14;
+            state.targetRotY = -24;
+            state.targetRotZ = 2;
+            state.targetPanX = 0;
+            state.targetPanY = 0;
+            state.targetScale = getInitialScale();
+        });
+
+        // Smooth Wheel Zoom
+        window.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY * -0.0011;
+            state.targetScale = Math.max(0.35, Math.min(1.85, state.targetScale + delta));
+        }, { passive: false });
+
+        // Touch Orbit & Pinch Zoom
+        window.addEventListener('touchstart', (e) => {
+            if (e.target.closest('.theme-toggle')) return;
+            if (e.touches.length === 1) {
+                isPointerDown = true;
+                hasDragged = false;
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            } else if (e.touches.length === 2) {
+                isPointerDown = false;
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                pinchStartDist = Math.hypot(dx, dy);
+                pinchStartScale = state.targetScale;
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1 && isPointerDown) {
+                const dx = e.touches[0].clientX - startX;
+                const dy = e.touches[0].clientY - startY;
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDragged = true;
+                state.targetRotY += dx * 0.4;
+                state.targetRotX = Math.max(-80, Math.min(80, state.targetRotX - dy * 0.35));
+                state.targetRotZ *= 0.94;
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            } else if (e.touches.length === 2 && pinchStartDist) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.hypot(dx, dy);
+                state.targetScale = Math.max(0.35, Math.min(1.85, pinchStartScale * (dist / pinchStartDist)));
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', () => {
+            isPointerDown = false;
+            pinchStartDist = null;
+        });
+
+        function animate() {
+            const damping = 0.11;
+            state.rotX += (state.targetRotX - state.rotX) * damping;
+            state.rotY += (state.targetRotY - state.rotY) * damping;
+            state.rotZ += (state.targetRotZ - state.rotZ) * damping;
+            state.scale += (state.targetScale - state.scale) * damping;
+            state.panX += (state.targetPanX - state.panX) * damping;
+            state.panY += (state.targetPanY - state.panY) * damping;
+
+            cameraRig.style.transform = `translate3d(${state.panX.toFixed(2)}px, ${state.panY.toFixed(2)}px, 0px) scale(${state.scale.toFixed(4)})`;
+            boardAssembly.style.transform = `rotateX(${state.rotX.toFixed(2)}deg) rotateY(${state.rotY.toFixed(2)}deg) rotateZ(${state.rotZ.toFixed(2)}deg)`;
+
+            // Dynamic face shading & glass glare as the board rotates
+            const radX = (state.rotX * Math.PI) / 180;
+            const radY = (state.rotY * Math.PI) / 180;
+            const sinY = Math.sin(radY);
+            const cosY = Math.cos(radY);
+            const sinX = Math.sin(radX);
+
+            rootStyle.setProperty('--light-front', Math.max(0.5, Math.min(1.18, 0.88 + cosY * 0.22 - sinX * 0.1)).toFixed(2));
+            rootStyle.setProperty('--light-back', Math.max(0.45, Math.min(1.18, 0.85 - cosY * 0.22)).toFixed(2));
+            rootStyle.setProperty('--light-left', Math.max(0.4, Math.min(1.25, 0.82 - sinY * 0.35)).toFixed(2));
+            rootStyle.setProperty('--light-right', Math.max(0.4, Math.min(1.25, 0.82 + sinY * 0.35)).toFixed(2));
+            rootStyle.setProperty('--light-top', Math.max(0.5, Math.min(1.3, 0.95 + sinX * 0.32)).toFixed(2));
+            rootStyle.setProperty('--light-bottom', Math.max(0.3, Math.min(0.9, 0.55 - sinX * 0.28)).toFixed(2));
+            rootStyle.setProperty('--glare-pos-x', `${(sinY * 18).toFixed(2)}%`);
+            rootStyle.setProperty('--glare-pos-y', `${(-sinX * 14 - 5).toFixed(2)}%`);
+            rootStyle.setProperty('--shadow-x', `${(-sinY * 45).toFixed(1)}px`);
+            rootStyle.setProperty('--shadow-y', `${(32 + Math.cos(radX) * 16).toFixed(1)}px`);
+
+            requestAnimationFrame(animate);
+        }
+
+        window.onload = function () {
+            animate();
+        };
     </script>
 </body>
 </html>
